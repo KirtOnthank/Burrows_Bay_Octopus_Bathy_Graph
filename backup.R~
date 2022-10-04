@@ -1,0 +1,159 @@
+library(plotKML)
+library("maptools")
+library(rgdal)
+library(ggplot2)
+library(geoR)
+library(seacarb)
+library(googlesheets)
+library(spatstat)
+library(marmap)
+library(ncdf4)
+library(viridis)
+library(colorRamps)
+
+##Getting shapefiles into R####
+wash.shp=readShapePoly("./Shapefiles/sample.shp")
+wash_utm.shp=readShapePoly("./Shapefiles/sample_utm.shp")
+salish_utm.shp=readShapePoly("./Shapefiles/salish_utm.shp")
+salish_area_utm.shp=readShapePoly("./Shapefiles/salish_area_utm.shp")
+just_wash_utm.shp=readShapePoly("./Shapefiles/just_wash_utm.shp")
+global.shp=readShapePoly('ne_10m_land/ne_10m_land.shp')
+minor.shp=readShapePoly('ne_10m_minor_islands/ne_10m_minor_islands.shp')
+
+burrows=getNOAA.bathy(lon1=-122.3,lon2=-123,lat1=48,lat2=48.6,resolution=1)
+plot(burrows,image=T)
+
+summary(burrows)
+
+depth=read.table('crm.xyz',header = F)
+burrows=as.bathy(depth)
+plot(burrows,image=T,xlim=c(-122.8,-122.4),ylim=c(48.4,48.6))
+scaleBathy(burrows,deg=0.1,x="bottomleft",inset=5)
+plot(wash.shp,col="grey",bg="transparent",add=T)
+
+
+small=read.table('burrows_small.xyz',header=F)
+small=as.bathy(small)
+plot(small,image=T)
+summary(small)
+
+smallish=read.table('burrows_small.xyz',header=F)
+smallish$V3[smallish$V3>=0]=0
+small.pp=as.geodata(smallish,coords.col = 1:2)
+points(small.pp,lwd=0)
+
+small.ppp=as.ppp(smallish,c(min(smallish$V1),max(smallish$V1),min(smallish$V2),max(smallish$V2)))
+plot(small.ppp,bg=terrain.colors(100), pch=21, cex=0.5,lwd=0.01)
+
+sanjuan.tab=read.table('sanjuan.xyz',header=F)
+sanjuan=as.bathy(sanjuan.tab)
+
+pt.nc=nc_open("port_townsend_13_navd88_2011.nc")
+pt=ncvar_get(pt.nc)
+
+lat=ncdf4::ncvar_get(pt.nc, varid="lat")
+lon=ncdf4::ncvar_get(pt.nc, varid="lon")
+
+crs=ncdf4::ncvar_get(pt.nc, varid="crs")
+band1=ncdf4::ncvar_get(pt.nc, varid="Band1")
+
+##test####
+papoue<-getNOAA.bathy(lon1=140,lon2=155,lat1=-13,lat2=0,resolution=1)
+plot(papoue)
+plot(papoue,image=T)
+blues<-colorRampPalette(c("red","purple","blue","cadetblue1","white"))
+plot(papoue,image=TRUE,bpal=blues(100))
+
+plot(papoue,image=TRUE,bpal=blues(100),
+  deep=c(-9000,-3000,0),
+  shallow=c(-3000,-10,0),
+  step=c(1000,1000,0),
+  lwd=c(0.8,0.8,1),
+  lty=c(1,1,1),
+  col=c("lightgrey","darkgrey","black"),
+  drawlabel=c(FALSE,FALSE,FALSE))
+
+# Creating a custom palette of blues
+blues <- colorRampPalette(c("white","lightsteelblue4", "lightsteelblue3",
+           "lightsteelblue2", "lightsteelblue1"))
+# Plotting the bathymetry with different colors for land and sea
+plot(small, image = TRUE, land = TRUE, lwd = 0.1,
+     bpal = blues(100),drawlabels=T)
+
+plot(small,image=T,lwd=0.2,
+     bpal = blues(100),drawlabels=T)
+# Making the coastline more visible
+plot(papoue, deep = 0, shallow = 0, step = 0,
+     lwd = 0.4, add = TRUE)
+
+
+aleu <- getNOAA.bathy(165, -145, 50, 65, resolution = 1,
+                      antimeridian = TRUE)
+plot(aleu, image = TRUE, land = TRUE, axes = FALSE, lwd=0.1,
+     bpal = list(c(0, max(aleu), grey(.7), grey(.9), grey(.95)),
+                 c(min(aleu), 0, "darkblue", "lightblue")))
+plot(aleu, n = 1, lwd = 0.5, add = TRUE)
+antimeridian.box(aleu)
+
+
+##plotting san juans####
+blues <- colorRampPalette(c("lightsteelblue4","lightsteelblue3",
+                            "lightsteelblue2", "lightsteelblue1","white"))
+
+png("sanjuan.png",width=2000,height=2000)
+plot(sanjuan,image=T,lwd=1,xlim=c(-123,-122.3),deepest.isobath=-2000,shallowest.isobath=15,
+     bpal = plasma(100),drawlabels=T,asp=1.6,step=1)
+plot(wash.shp,col="grey",bg="transparent",add=T,lwd=2)
+scaleBathy(sanjuan,deg=0.5)
+dev.off()
+
+##plotting the salish sea####
+salish=getNOAA.bathy(lon1=-124.8,lon2=-121.9,lat1=47,lat2=50,resolution=1)
+plot(salish,asp=1.6,image=T,bpal=viridis(100),n=20,lty=0)
+plot(global.shp,col="grey",bg="transparent",add=T,lwd=1)
+plot(minor.shp,col="grey",bg="transparent",add=T,lwd=1)
+lines(c(-123.1,-123.1),c(48.1,48.65),col="red",lwd=3)
+lines(c(-122.3,-122.3),c(48.1,48.65),col="red",lwd=3)
+lines(c(-122.3,-123.1),c(48.1,48.1),col="red",lwd=3)
+lines(c(-122.3,-123.1),c(48.65,48.65),col="red",lwd=3)
+
+##depth Key###
+
+key.start=-124
+key.end=-122
+key.top=47.75
+key.bottom=47.5
+
+key.points=seq(from=key.start,to=key.end,length.out=100)
+
+for(i in 1:length(key.points)){
+  lines(rep(key.points[i],2),c(key.bottom,key.top),col=viridis(100)[i],lwd=3)
+}
+lines(c(key.start,key.end,key.end,key.start,key.start),c(key.bottom,key.bottom,key.top,key.top,key.bottom),lwd=3)
+text(mean(c(key.start,key.end)),key.top+0.1,"Depth (m)",cex=1)
+text(key.start,key.bottom-0.15,547)
+text(mean(c(key.start,key.end)),key.bottom-0.15,round(547/2))
+text(key.end,key.bottom-0.15,0)
+
+summary(salish)
+
+
+##The figure###
+png("sanjuan2.png",width=3000,height=2000)
+
+par(fig=c(0,0.3,0,1))
+plot(salish,asp=1.6,image=T,bpal=viridis(100),n=20,lty=0)
+plot(global.shp,col="grey",bg="transparent",add=T,lwd=1)
+plot(minor.shp,col="grey",bg="transparent",add=T,lwd=1)
+lines(c(-123.1,-123.1),c(48.1,48.65),col="red",lwd=3)
+lines(c(-122.3,-122.3),c(48.1,48.65),col="red",lwd=3)
+lines(c(-122.3,-123.1),c(48.1,48.1),col="red",lwd=3)
+lines(c(-122.3,-123.1),c(48.65,48.65),col="red",lwd=3)
+
+
+par(fig=c(0.3,1,0,1),new=T)
+plot(sanjuan,image=T,lwd=1,xlim=c(-123,-122.3),deepest.isobath=-2000,shallowest.isobath=15,
+     bpal = plasma(100),drawlabels=T,asp=1.6,step=3)
+plot(wash.shp,col="grey",bg="transparent",add=T,lwd=2)
+scaleBathy(sanjuan,deg=0.5)
+dev.off()
